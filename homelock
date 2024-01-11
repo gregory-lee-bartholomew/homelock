@@ -1,0 +1,199 @@
+#!/usr/bin/bash
+# vim:set ts=2 sw=2 et:
+
+exec {stdout}>&1 &>/dev/console
+
+set -e
+shopt -s lastpipe
+
+# needed by setterm
+TERM="linux"
+
+PATH='/sbin:/bin'
+
+SELF="${0##*/}"
+
+USER="$PAM_USER"
+
+CLRS="$([[ $* == *m* ]]; printf "$?")"
+
+function note {
+  if [[ $1 =~ ^warning|error ]]; then
+    [[ $CLRS == 1 ]] && setterm --foreground red
+  else
+    [[ $CLRS == 1 ]] && setterm --foreground green
+  fi
+
+  printf "$SELF: $*"
+
+  if [[ $* == error ]]; then
+    printf ', an error has occurred on line %d of %s' \
+      "${BASH_LINENO[0]}" "${BASH_SOURCE[1]}"
+  fi
+
+  [[ $CLRS == 1 ]] && setterm --foreground default
+
+  printf '\n'
+}
+
+function bold {
+  [[ $CLRS == 1 ]] && setterm --bold on
+  printf "$*"
+  [[ $CLRS == 1 ]] && setterm --bold off
+}
+
+function powersave {
+  case "$1" in
+    (on)
+      if ! [[ $POWERSAVE_TIMEOUT =~ ^[0-9]|[1-5][0-9]|60$ ]]; then
+        POWERSAVE_TIMEOUT=1
+      fi
+
+      if
+        setterm --blank="$POWERSAVE_TIMEOUT" --powersave on < /dev/console
+      then
+        note "display powersave set to $(bold $POWERSAVE_TIMEOUT) minutes"
+      else
+        note "warning, failed to enable display powersave"
+      fi
+    ;;
+    (off)
+      if
+        setterm --blank="0" --powersave off < /dev/console
+      then
+        note "display powersave disabled"
+      else
+        note "warning, failed to disable display powersave"
+      fi
+    ;;
+  esac
+}
+
+function cleanup {
+  rv=$?
+
+  if [[ $* == *p* ]]; then
+    case "$PAM_TYPE" in
+      (auth)
+        if [[ $rv -eq 0 ]]; then
+          powersave off
+        fi
+      ;;
+      (close_session)
+        powersave on
+      ;;
+    esac
+  fi
+
+  [[ $CLRS == 1 ]] && setterm --default
+
+  exit $rv
+}
+
+# prevent this script from failing if the setterm command is unavailable
+function setterm {
+  /bin/setterm --term "$TERM" $* && :
+}
+
+# refuse to run if we were not called by pam_exec
+if [[ -z $PAM_USER ]]; then
+  printf "error, $SELF must be called by pam_exec\n" > /proc/self/fd/$stdout
+  exit 1
+fi
+
+# clear any settings (bold, color, etc.) that may be left over from the last
+# program that wrote to the console
+[[ $CLRS == 1 ]] && setterm --default
+
+# clear all text from the console on logout if the -c flag was passed
+[[ $PAM_TYPE == close_session ]] && [[ $* == *c* ]] && setterm --clear
+
+# valid flags:
+# -c (clear): clear the console just before printing homelock's status messages
+# -f (force): before unmounting $HOME, attempt to kill any processes with open
+#    file locks under $HOME (requires lsof)
+# -e (export): export $POOL after unmounting $HOME
+# -p (powersave): enable console powersave mode after logging out (when set on
+#    the session stack) and disable it when logging in (when set on the auth
+#    stack). the timeout can be set from 1 to 60 minutes by setting the
+#    POWERSAVE_TIMEOUT variable in the homelock.conf configuration file.
+# -m (monochrome): disable colorized output
+
+for FLAG in "$@"; do
+  if ! [[ $FLAG =~ ^-[cfepm]$ ]]; then
+    note "error, invalid flag $(bold $FLAG)"
+    exit 1
+  fi
+done
+
+trap "note error" err
+trap "cleanup $*" exit
+
+# source the configuration file now so the user can override any settings or
+# functions that were defined above (e.g. $POWERSAVE_TIMEOUT, $TERM, etc.)
+. "${0%/*}/$SELF.conf"
+
+# the first component of the $HOMES path is expected to be the zfs pool
+POOL="${HOMES%%/*}"
+
+# abort with a non-fatal error code if the user isn't in the allow list
+printf '%s\n' "${USERS[@]}" | grep -Fqx "$PAM_USER" || exit 0
+
+getent passwd "$PAM_USER" | readarray -t -d ':' PASS
+
+HOME="${PASS[5]}"
+
+if [[ -z $HOME ]]; then
+  note "error, could not determine home directory for user $(bold $PAM_USER)"
+  exit 1
+fi
+
+case "$PAM_TYPE" in
+  (auth)
+    if ! mountpoint -q "$HOME"; then
+      if ! zpool list -H -o name "$POOL" &> /dev/null; then
+        zpool import -f -o cachefile=none -N "$POOL"
+      fi
+      # pam_exec's "expose_authtok" flag must be set in the auth stack, then
+      # zfs mount's "-l" flag will cause zfs to read the password from stdin
+      zfs mount -l "$HOMES"
+    fi
+  ;;
+  (close_session)
+    loginctl --value --property="Sessions" show-user "$PAM_USER" \
+      2>/dev/null | readarray -t -d ' ' SESSIONS
+    if [[ ${#SESSIONS[@]} -gt 1 ]]; then
+      note "warning, user $(bold $PAM_USER) still has active sessions," \
+        "refusing to unmount $(bold $HOME)"
+      exit 0
+    fi
+    if mountpoint -q "$HOME"; then
+      COUNT=0
+      TRIES=3
+      [[ $* == *f* ]] && lsof -t "$HOME" | xargs -r kill || :
+      while ! zfs unmount -u "$HOMES" &> /dev/null; do
+        COUNT=$(($COUNT+1))
+        if ! (($COUNT<$TRIES)); then
+          note "error, failed to unmount $(bold $HOME)"
+          exit 1
+        fi
+        sleep 1
+      done
+      note "$(bold $HOME) unmounted"
+    fi
+    if [[ $* == *e* ]]; then
+      if findmnt -n -t zfs -o source | grep -q -w "^$POOL"; then
+        note "warning, pool $(bold $POOL) still has active mounts," \
+          "refusing to export"
+        exit 0
+      fi
+      if ! zpool export "$POOL"; then
+        note "error, failed to export zfs pool $(bold $POOL)"
+        exit 1
+      fi
+    fi
+    note "zfs pool $(bold $POOL) exported"
+  ;;
+esac
+
+exit 0

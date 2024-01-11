@@ -1,0 +1,54 @@
+#!/usr/bin/bash
+# vim:set ts=3 sw=3:
+
+set -e
+shopt -s lastpipe
+
+trap 'echo an error has occurred on line ${LINENO} of ${0##*/}' err
+
+[[ $1 =~ ^add|remove$ ]]
+
+authselect current -r | readarray -d ' ' -t CURRENT
+
+SOURCE="${CURRENT[0]}"; unset CURRENT[0];
+TARGET="custom/homelock"
+
+if [[ $1 == add ]]; then
+	cp -v "homelock.pam" "/etc/pam.d/homelock"
+
+	if [[ $SOURCE != $TARGET ]]; then
+		rm -rf "/etc/authselect/$TARGET"
+		mkdir "/etc/authselect/$TARGET"
+		if [[ $SOURCE =~ ^custom/ ]]; then
+			cp /etc/authselect/$SOURCE/* "/etc/authselect/$TARGET"
+		else
+			cp /usr/share/authselect/default/$SOURCE/* "/etc/authselect/$TARGET"
+		fi
+	fi
+
+	if ! grep -q homelock /etc/authselect/$TARGET/system-auth; then
+		MATCH='^auth\(\s\+\)[^ ]\+\(\s\+\)pam_unix.so.*$'
+		SUBST='auth\1include	 \2homelock\n&'
+		sed -i.bak "s/$MATCH/$SUBST/" "/etc/authselect/$TARGET/system-auth"
+	fi
+
+	if [[ $SOURCE != $TARGET ]]; then
+		authselect "select" "$TARGET" ${CURRENT[*]}
+	else
+		authselect "apply-changes"
+	fi
+
+	if ! grep -q homelock /etc/pam.d/login; then
+		MATCH='^session\(\s\+\)[^ ]\+\(\s\+\)pam_loginuid.so.*$'
+		SUBST='session\1include \2homelock\n&'
+		sed -i.bak "s/$MATCH/$SUBST/" "/etc/pam.d/login"
+	fi
+fi
+
+if [[ $1 == remove ]]; then
+	sed -i.bak '/homelock/ d' "/etc/authselect/$TARGET/system-auth"
+
+	authselect "apply-changes"
+
+	sed -i.bak '/homelock/ d' "/etc/pam.d/login"
+fi

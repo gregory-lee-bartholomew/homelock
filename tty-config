@@ -1,0 +1,45 @@
+#!/usr/bin/bash
+# vim:set ts=3 sw=3:
+
+set -e
+
+trap 'echo an error has occurred on line ${LINENO} of ${0##*/}' err
+
+[[ $1 =~ ^add|remove$ ]]
+
+CONFIG_DIR='/etc/systemd/system'
+
+if [[ $1 == add ]]; then
+	mkdir -p "$CONFIG_DIR/getty@.service.d"
+	cat <<- END > "$CONFIG_DIR/getty@.service.d/homelock-override.conf"
+		[Service]
+		TTYReset=no
+		TTYVHangup=no
+		TTYVTDisallocate=no
+	END
+
+	cat <<- END > "$CONFIG_DIR/homelock-powersave.service"
+		[Unit]
+		Description=Enable powersave on the initial virtual terminal
+
+		[Service]
+		Type=oneshot
+		ExecStart=-/usr/bin/setterm --term linux --blank=1 --powersave on
+		StandardInput=tty-force
+		RemainAfterExit=true
+
+		[Install]
+		WantedBy=multi-user.target
+	END
+
+	systemctl daemon-reload
+	systemctl enable homelock-powersave.service
+fi
+
+if [[ $1 == remove ]]; then
+	systemctl disable homelock-powersave.service
+	rm -f "$CONFIG_DIR/homelock-powersave.service" \
+		"$CONFIG_DIR/getty@.service.d/homelock-override.conf"
+	rmdir --ignore-fail-on-non-empty "$CONFIG_DIR/getty@.service.d"
+	systemctl daemon-reload
+fi

@@ -1,0 +1,10 @@
+# The following auth lines are expected to serve as an alternative to the
+# "auth sufficient pam_unix.so" line in the auth stack that included them;
+# hence the "default=1" below will skip that one line in the parent file
+# that immediately follows the "auth include homelock" line which sourced
+# this file.
+auth [success=ignore default=2]                     pam_succeed_if.so quiet service in login
+auth [success=ok new_authtok_reqd=ok default=2]     pam_unix.so
+auth [success=done new_authtok_reqd=done default=1] pam_exec.so expose_authtok /etc/security/homelock -p
+
+session optional pam_exec.so /etc/security/homelock -c -f -p

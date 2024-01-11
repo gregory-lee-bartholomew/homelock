@@ -1,0 +1,10 @@
+module homelock 1.0;
+
+require {
+	type local_login_t;
+	type unlabeled_t;
+	class dir search;
+}
+
+#============= local_login_t ==============
+allow local_login_t unlabeled_t:dir search;
