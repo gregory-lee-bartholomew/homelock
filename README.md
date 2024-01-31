@@ -39,7 +39,7 @@ This software is a single script -- `homelock` -- that is called from the PAM au
  
 At its core, this script is executing two commands: `zfs mount -l $HOMES` on user login and `zfs unmount -u $HOMES` on user logout ($HOMES is set in homelock.conf). If provided a password on standard input, the `-l` option to `zfs mount` will automatically unlock an encrypted filesystem. By calling `homelock` using `pam_exec.so` from PAM's *auth* stack with the *expose_authtok* option set, the homelock script (and, by extension, the `zfs mount -l $HOMES` command) is provided the user's login password on standard input.
 
-This script is designed to work with console logins (though it may be possible to make it work with other PAM services such as GDM). In particular, it prints success or failure status messages to /dev/console so the user will know that their directory has been locked after they exit their login session. This system works well with the Sway window manager which can be launched directly from the console after the user has logged in (see Appendex A below for an example ~/.bashrc snippet that I use to auto-launch Sway when I sign in on TTY1).
+This script is designed to work with console logins (though it may be possible to make it work with other PAM services such as GDM). In particular, it prints success or failure status messages to /dev/console so the user will know that their directory has been locked after they exit their login session. This system works well with the Sway window manager which can be launched directly from the console after the user has logged in (see Appendix A below for an example ~/.bashrc snippet that I use to auto-launch Sway when I sign in on TTY1).
 
 # Known Bugs
 
@@ -49,7 +49,9 @@ If exporting the pool on logout is enabled, logging out and back in quickly may 
 
 This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more details.
 
-# Appendex A
+# Appendix A
+
+The following script, if saved as ~/.bashrc.d/99-sway-on-tty1, will launch the Sway window manager when you sign in on TTY1.
 
     # Run Sway on TTY1
     if [[ -x /usr/bin/sway ]] && [[ $(tty) == /dev/tty1 ]]; then
@@ -65,3 +67,10 @@ This program is distributed in the hope that it will be useful, but WITHOUT ANY 
         exec "${SSH_AGENT[@]}" /usr/bin/sway
     fi
 
+# Appendix B
+
+As an optional feature, this homelock script will accept a `-e` flag when called from the session stack in /etc/pam.d/homelock which will instruct it to import the ZFS pool containing the user's home directory when they sign in and export it when they sign out. The `-e` feature flag is useful in case the user has moved their home directory to a ZFS pool on a removable device such as a USB drive.
+
+**TIP**: If you choose to store your home directory on a USB flash drive, be aware that the typical USB flash drive does not perform well when doing random I/O. You may need to purchase a flash drive that boasts good, sustained random I/O throughput. For what it is worth, I own a couple Axe Memory SuperSpeed+ USB 3.2 Gen2 flash drives that work very well as removable drives to keep my mirrored and encrypted ZFS home directory on:
+
+![Axe Memory SuperSpeed+ USB 3.2 Gen2 flash drives](./axe-usb-drives.jpg)
