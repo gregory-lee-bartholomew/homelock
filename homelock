@@ -191,8 +191,8 @@ case "$PAM_TYPE" in
         note "error, failed to export zfs pool $(bold $POOL)"
         exit 1
       fi
+      note "zfs pool $(bold $POOL) exported"
     fi
-    note "zfs pool $(bold $POOL) exported"
   ;;
 esac
 
