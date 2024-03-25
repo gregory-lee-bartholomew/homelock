@@ -25,9 +25,10 @@ From the root of this git repostory, run the following commands to install homel
 
 After it is installed, you will need to edit /etc/security/homelock.conf and change the *poolname* and *username* values to match your environment. You might also need to adjust the value for the HOMES variable so that it will resolve to the correct path for your encrypted user home directories.
 
-To uninstall homelock, the following command can be used:
+To uninstall homelock, the following commands can be used:
 
     $ sudo make uninstall
+    $ sudo make sepolicy_uninstall
 
 # PAM
 

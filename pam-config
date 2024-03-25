@@ -14,7 +14,9 @@ SOURCE="${CURRENT[0]}"; unset CURRENT[0];
 TARGET="custom/homelock"
 
 if [[ $1 == add ]]; then
-	cp -v "homelock.pam" "/etc/pam.d/homelock"
+	cp -v -n "homelock.pam" "/etc/pam.d/homelock" || :
+
+	[[ -e /etc/pam.d/homelock ]]
 
 	if [[ $SOURCE != $TARGET ]]; then
 		rm -rf "/etc/authselect/$TARGET"
@@ -51,4 +53,6 @@ if [[ $1 == remove ]]; then
 	authselect "apply-changes"
 
 	sed -i.bak '/homelock/ d' "/etc/pam.d/login"
+
+	mv '/etc/pam.d/homelock' '/etc/pam.d/homelock.bak'
 fi
