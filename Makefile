@@ -19,6 +19,8 @@ install : test
 	chmod -v +x /etc/security/homelock
 	./pam-config add
 	./tty-config add
+	printf 'kernel.printk = %s\n' "$$(sed 's/[0-7]/0/' /proc/sys/kernel/printk)" \
+		> /etc/sysctl.d/homelock.conf
 
 %.pp : %.te
 	test -e $(selinuxdevel) || \
@@ -41,6 +43,7 @@ uninstall : test
 	./tty-config remove || :
 	./pam-config remove
 	rm -vf /etc/security/homelock{,.conf}
+	rm -vf /etc/sysctl.d/homelock.conf
 
 sepolicy_uninstall :
 	semanage fcontext -d $(se_fcontexts) || :
