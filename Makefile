@@ -1,5 +1,7 @@
 # vim:set ts=3:
 
+pool ?= root
+
 selinuxdevel := /usr/share/selinux/devel/Makefile
 se_fcontexts := -t mount_exec_t "/etc/security/homelock"
 
@@ -13,6 +15,7 @@ test :
 install : test
 	cp -v homelock /etc/security
 	cp -n -v homelock.conf /etc/security || :
+	sed -i "/^POOL=/ s/=.*/='${pool}'/;" /etc/security/homelock.conf
 	chmod -v +x /etc/security/homelock
 	./pam-config add
 	./tty-config add
