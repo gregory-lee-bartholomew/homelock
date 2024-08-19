@@ -23,7 +23,7 @@ From the root of this git repostory, run the following commands to install homel
     $ sudo make install
     $ sudo make sepolicy_install
 
-After it is installed, you will need to edit /etc/security/homelock.conf and change the *poolname* and *username* values to match your environment. You might also need to adjust the value for the HOMES variable so that it will resolve to the correct path for your encrypted user home directories.
+After it is installed, you will need to edit /etc/security/homelock.conf and change the *poolname* and *username* values to match your environment. You might also need to adjust the value for the ZHOME variable so that it will resolve to the correct path for your encrypted user home directories.
 
 To uninstall homelock, the following commands can be used:
 
@@ -38,7 +38,7 @@ There is a helper script named pam-config that is called automatically by `make 
 
 This software is a single script -- `homelock` -- that is called from the PAM authentication subsystem to unlock and mount a home directory on user login and subsequently lock and unmount a home directory on user logout. It will use the password provided during user login to unlock the home directory.
  
-At its core, this script is executing two commands: `zfs mount -l $HOMES` on user login and `zfs unmount -u $HOMES` on user logout ($HOMES is set in homelock.conf). If provided a password on standard input, the `-l` option to `zfs mount` will automatically unlock an encrypted filesystem. By calling `homelock` using `pam_exec.so` from PAM's *auth* stack with the *expose_authtok* option set, the homelock script (and, by extension, the `zfs mount -l $HOMES` command) is provided the user's login password on standard input.
+At its core, this script is executing two commands: `zfs mount -l $ZHOME` on user login and `zfs unmount -u $ZHOME` on user logout ($ZHOME is set in homelock.conf). If provided a password on standard input, the `-l` option to `zfs mount` will automatically unlock an encrypted filesystem. By calling `homelock` using `pam_exec.so` from PAM's *auth* stack with the *expose_authtok* option set, the homelock script (and, by extension, the `zfs mount -l $ZHOME` command) is provided the user's login password on standard input.
 
 This script is designed to work with console logins (though it may be possible to make it work with other PAM services such as GDM). In particular, it prints success or failure status messages to /dev/console so the user will know that their directory has been locked after they exit their login session. This system works well with the Sway window manager which can be launched directly from the console after the user has logged in (see Appendix A below for an example ~/.bashrc snippet that I use to auto-launch Sway when I sign in on TTY1).
 
