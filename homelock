@@ -197,6 +197,12 @@ case "$PAM_TYPE" in
       note "zfs pool $(bold $POOL) exported"
     fi
   ;;
+  (open_session)
+    exit 0
+  ;;
+  (*)
+    # return failure if homelock is called from any pam stack other than the
+    # ones handled in the above cases
+    exit 1
+  ;;
 esac
-
-exit 0
