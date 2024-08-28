@@ -1,10 +1,11 @@
 #!/usr/bin/bash
 # vim:set ts=2 sw=2 et:
 
-exec {stdout}>&1 &>/dev/console
-
 set -e
 shopt -s lastpipe
+
+exec {stdout}>&1
+[[ -w /dev/console ]] && exec &>/dev/console
 
 # needed by setterm
 TERM="linux"
@@ -17,23 +18,28 @@ USER="$PAM_USER"
 
 CLRS="$([[ $* == *m* ]]; printf "$?")"
 
+function echo {
+  local IFS=''; printf -- "$SELF: $*"
+}
+
 function note {
-  if [[ $1 =~ ^warning|error ]]; then
-    [[ $CLRS == 1 ]] && setterm --foreground red
-  else
-    [[ $CLRS == 1 ]] && setterm --foreground green
-  fi
-
-  printf "$SELF: $*"
-
-  if [[ $* == error ]]; then
-    printf ', an error has occurred on line %d of %s' \
-      "${BASH_LINENO[0]}" "${BASH_SOURCE[1]}"
-  fi
-
+  [[ $CLRS == 1 ]] && setterm --foreground green
+  echo "$*\n"
   [[ $CLRS == 1 ]] && setterm --foreground default
+}
 
-  printf '\n'
+function warn {
+  [[ $CLRS == 1 ]] && setterm --foreground red
+  echo "warning, $*\n"
+  [[ $CLRS == 1 ]] && setterm --foreground default
+}
+
+function fail {
+  [[ $CLRS == 1 ]] && setterm --foreground red
+  echo "error, $*\n" \
+    "an error has occurred on line ${BASH_LINENO[0]} of ${BASH_SOURCE[1]}\n"
+  [[ $CLRS == 1 ]] && setterm --foreground default
+  exit 1
 }
 
 function bold {
@@ -54,7 +60,7 @@ function powersave {
       then
         note "display powersave set to $(bold $POWERSAVE_TIMEOUT) minutes"
       else
-        note "warning, failed to enable display powersave"
+        warn "failed to enable display powersave"
       fi
     ;;
     (off)
@@ -63,7 +69,7 @@ function powersave {
       then
         note "display powersave disabled"
       else
-        note "warning, failed to disable display powersave"
+        warn "failed to disable display powersave"
       fi
     ;;
   esac
@@ -97,8 +103,8 @@ function setterm {
 
 # refuse to run if we were not called by pam_exec
 if [[ -z $PAM_USER ]]; then
-  printf "error, $SELF must be called by pam_exec\n" > /proc/self/fd/$stdout
-  exit 1
+  exec &>/proc/self/fd/$stdout
+  fail "$SELF must be called by pam_exec"
 fi
 
 # clear any settings (bold, color, etc.) that may be left over from the last
@@ -121,12 +127,11 @@ fi
 
 for FLAG in "$@"; do
   if ! [[ $FLAG =~ ^-[cfepm]$ ]]; then
-    note "error, invalid flag $(bold $FLAG)"
-    exit 1
+    fail "invalid flag $(bold $FLAG)"
   fi
 done
 
-trap "note error" err
+trap "fail" err
 trap "cleanup $*" exit
 
 # source the configuration file now so the user can override any settings or
@@ -134,8 +139,7 @@ trap "cleanup $*" exit
 . "${0%/*}/$SELF.conf"
 
 if [[ -z $POOL ]]; then
-  note "error, $(bold \$POOL) not defined"
-  exit 1
+  fail "$(bold \$POOL) not defined"
 fi
 
 # abort with a non-fatal error code if the user isn't in the allow list
@@ -146,8 +150,7 @@ getent passwd "$PAM_USER" | readarray -t -d ':' PASS
 HOME="${PASS[5]}"
 
 if [[ -z $HOME ]]; then
-  note "error, could not determine home directory for user $(bold $PAM_USER)"
-  exit 1
+  fail "could not determine home directory for user $(bold $PAM_USER)"
 fi
 
 case "$PAM_TYPE" in
@@ -165,7 +168,7 @@ case "$PAM_TYPE" in
     loginctl --value --property="Sessions" show-user "$PAM_USER" \
       2>/dev/null | readarray -t -d ' ' SESSIONS
     if [[ ${#SESSIONS[@]} -gt 1 ]]; then
-      note "warning, user $(bold $PAM_USER) still has active sessions," \
+      warn "user $(bold $PAM_USER) still has active sessions," \
         "refusing to unmount $(bold $HOME)"
       exit 0
     fi
@@ -176,8 +179,7 @@ case "$PAM_TYPE" in
       while ! zfs unmount -u "$ZHOME" &> /dev/null; do
         COUNT=$(($COUNT+1))
         if ! (($COUNT<$TRIES)); then
-          note "error, failed to unmount $(bold $HOME)"
-          exit 1
+          fail "failed to unmount $(bold $HOME)"
         fi
         sleep 1
       done
@@ -185,13 +187,12 @@ case "$PAM_TYPE" in
     fi
     if [[ $* == *e* ]]; then
       if findmnt -n -t zfs -o source | grep -q -w "^$POOL"; then
-        note "warning, pool $(bold $POOL) still has active mounts," \
+        warn "pool $(bold $POOL) still has active mounts," \
           "refusing to export"
         exit 0
       fi
       if ! zpool export "$POOL"; then
-        note "error, failed to export zfs pool $(bold $POOL)"
-        exit 1
+        fail "failed to export zfs pool $(bold $POOL)"
       fi
       note "zfs pool $(bold $POOL) exported"
     fi
