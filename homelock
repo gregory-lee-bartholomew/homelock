@@ -16,36 +16,38 @@ SELF="${0##*/}"
 
 USER="$PAM_USER"
 
-CLRS="$([[ $* == *m* ]]; printf "$?")"
+# the "m" flag signifies monochrome output
+! [[ $* == *m* ]];
+MONO="$?"
 
 function echo {
   local IFS=''; printf -- "$SELF: $*"
 }
 
 function note {
-  [[ $CLRS == 1 ]] && setterm --foreground green
+  [[ $MONO == 1 ]] || setterm --foreground green
   echo "$*\n"
-  [[ $CLRS == 1 ]] && setterm --foreground default
+  [[ $MONO == 1 ]] || setterm --foreground default
 }
 
 function warn {
-  [[ $CLRS == 1 ]] && setterm --foreground red
+  [[ $MONO == 1 ]] || setterm --foreground red
   echo "warning, $*\n"
-  [[ $CLRS == 1 ]] && setterm --foreground default
+  [[ $MONO == 1 ]] || setterm --foreground default
 }
 
 function fail {
-  [[ $CLRS == 1 ]] && setterm --foreground red
+  [[ $MONO == 1 ]] || setterm --foreground red
   echo "error, $*\n" \
     "an error has occurred on line ${BASH_LINENO[0]} of ${BASH_SOURCE[1]}\n"
-  [[ $CLRS == 1 ]] && setterm --foreground default
+  [[ $MONO == 1 ]] || setterm --foreground default
   exit 1
 }
 
 function bold {
-  [[ $CLRS == 1 ]] && setterm --bold on
+  [[ $MONO == 1 ]] || setterm --bold on
   printf "$*"
-  [[ $CLRS == 1 ]] && setterm --bold off
+  [[ $MONO == 1 ]] || setterm --bold off
 }
 
 function powersave {
@@ -91,7 +93,7 @@ function cleanup {
     esac
   fi
 
-  [[ $CLRS == 1 ]] && setterm --default
+  [[ $MONO == 1 ]] || setterm --default
 
   exit $rv
 }
@@ -109,7 +111,7 @@ fi
 
 # clear any settings (bold, color, etc.) that may be left over from the last
 # program that wrote to the console
-[[ $CLRS == 1 ]] && setterm --default
+[[ $MONO == 1 ]] || setterm --default
 
 # clear all text from the console on logout if the -c flag was passed
 [[ $PAM_TYPE == close_session ]] && [[ $* == *c* ]] && setterm --clear
