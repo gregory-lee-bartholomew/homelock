@@ -1,6 +1,8 @@
 #!/usr/bin/bash
 # vim:set ts=2 sw=2 et:
 
+trap '' term kill
+
 set -e
 shopt -s lastpipe
 
