@@ -48,7 +48,7 @@ function fail {
 
 function bold {
   [[ $MONO == 1 ]] || setterm --bold on
-  printf "$*"
+  printf -- "$*"
   [[ $MONO == 1 ]] || setterm --bold off
 }
 
@@ -128,9 +128,10 @@ fi
 #    stack). the timeout can be set from 1 to 60 minutes by setting the
 #    POWERSAVE_TIMEOUT variable in the homelock.conf configuration file.
 # -m (monochrome): disable colorized output
+# -d (debug): show extra output on error
 
 for FLAG in "$@"; do
-  if ! [[ $FLAG =~ ^-[cfepm]$ ]]; then
+  if ! [[ $FLAG =~ ^-[cfepmd]$ ]]; then
     fail "invalid flag $(bold $FLAG)"
   fi
 done
@@ -174,6 +175,9 @@ case "$PAM_TYPE" in
     if [[ ${#SESSIONS[@]} -gt 1 ]]; then
       warn "user $(bold $PAM_USER) still has active sessions," \
         "refusing to unmount $(bold $HOME)"
+      if [[ $* == *d* ]]; then
+        loginctl --no-pager --no-legend --lines 0 user-status "$PAM_USER"
+      fi
       exit 0
     fi
     if mountpoint -q "$HOME"; then
