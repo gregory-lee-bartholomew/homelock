@@ -102,7 +102,7 @@ function cleanup {
 
 # prevent this script from failing if the setterm command is unavailable
 function setterm {
-  /bin/setterm --term "$TERM" $* && :
+  command -p setterm --term "$TERM" $* && :
 }
 
 # refuse to run if we were not called by pam_exec
