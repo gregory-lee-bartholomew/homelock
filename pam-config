@@ -41,8 +41,8 @@ if [[ $1 == add ]]; then
 	fi
 
 	if ! grep -q homelock /etc/pam.d/login; then
-		MATCH='^session\(\s\+\)[^ ]\+\(\s\+\)pam_loginuid.so.*$'
-		SUBST='session\1include \2homelock\n&'
+		MATCH='^session\(\s\+\)[^ ]\+\(\s\+\)postlogin.*$'
+		SUBST='&\nsession\1include\2homelock'
 		sed -i.bak "s/$MATCH/$SUBST/" "/etc/pam.d/login"
 	fi
 fi
