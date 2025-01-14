@@ -170,16 +170,24 @@ case "$PAM_TYPE" in
     fi
   ;;
   (close_session)
-    loginctl --value --property="Sessions" show-user "$PAM_USER" \
+    loginctl kill-session '' &
+    COUNT=0
+    TRIES=3
+    while loginctl --value --property="Sessions" show-user "$PAM_USER" \
       2>/dev/null | readarray -t -d ' ' SESSIONS
-    if [[ ${#SESSIONS[@]} -gt 1 ]]; then
-      warn "user $(bold $PAM_USER) still has active sessions," \
-        "refusing to unmount $(bold $HOME)"
-      if [[ $* == *d* ]]; then
-        loginctl --no-pager --no-legend --lines 0 user-status "$PAM_USER"
+    do
+      [[ ${#SESSIONS[@]} -le 2 ]] && break
+      COUNT=$(($COUNT+1))
+      if ! (($COUNT<$TRIES)); then
+        warn "user $(bold $PAM_USER) still has active sessions," \
+          "refusing to unmount $(bold $HOME)"
+        if [[ $* == *d* ]]; then
+          loginctl --no-pager --no-legend --lines 0 user-status "$PAM_USER"
+        fi
+        exit 0
       fi
-      exit 0
-    fi
+      sleep 1
+    done
     if mountpoint -q "$HOME"; then
       COUNT=0
       TRIES=3
