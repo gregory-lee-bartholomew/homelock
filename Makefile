@@ -19,8 +19,6 @@ install : test
 	chmod -v +x /etc/security/homelock
 	./pam-config add
 	./tty-config add
-	printf 'kernel.printk = %s\n' "$$(sed 's/[0-7]/0/' /proc/sys/kernel/printk)" \
-		> /etc/sysctl.d/homelock.conf
 
 %.pp : %.te
 	test -e $(selinuxdevel) || \

@@ -22,6 +22,16 @@ USER="$PAM_USER"
 ! [[ $* == *m* ]];
 MONO="$?"
 
+function pause {
+  [[ $PAM_TYPE == close_session ]] || return
+  if ! [[ $KMSCONMSG_TIMEOUT =~ ^[0-9]|[1-5][0-9]|60$ ]]; then
+    KMSCONMSG_TIMEOUT=10
+  fi
+  trap ':' int
+  exec <"$PAM_TTY"
+  sleep "$KMSCONMSG_TIMEOUT"
+}
+
 function echo {
   local IFS=''; printf -- "$SELF: $*"
 }
@@ -43,6 +53,7 @@ function fail {
   echo "error, $*\n" \
     "an error has occurred on line ${BASH_LINENO[0]} of ${BASH_SOURCE[1]}\n"
   [[ $MONO == 1 ]] || setterm --foreground default
+  [[ $(trap -p exit) =~ cleanup ]] || pause
   exit 1
 }
 
@@ -91,17 +102,14 @@ function cleanup {
       ;;
       (close_session)
         powersave on
-        if [[ $PAM_TTY =~ pts ]]; then
-          if ! [[ $KMSCONMSG_TIMEOUT =~ ^[0-9]|[1-5][0-9]|60$ ]]; then
-            KMSCONMSG_TIMEOUT=10
-          fi
-          trap : int
-          exec <"$PAM_TTY"
-          sleep "$KMSCONMSG_TIMEOUT"
-        fi
       ;;
     esac
   fi
+
+  # if we are running under a pseudoterminal, the user is likely using kmscon,
+  # so pause (interrupable via ctrl-c) so the user can read the status and/or
+  # error messages before kmscon clears the screen
+  [[ $PAM_TTY =~ pts ]] && pause
 
   [[ $MONO == 1 ]] || setterm --default
 
