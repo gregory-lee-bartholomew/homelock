@@ -95,6 +95,8 @@ function cleanup {
           if ! [[ $KMSCONMSG_TIMEOUT =~ ^[0-9]|[1-5][0-9]|60$ ]]; then
             KMSCONMSG_TIMEOUT=10
           fi
+          trap : int
+          exec <"$PAM_TTY"
           sleep "$KMSCONMSG_TIMEOUT"
         fi
       ;;
