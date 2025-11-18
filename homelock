@@ -172,7 +172,7 @@ case "$PAM_TYPE" in
   (close_session)
     loginctl kill-session '' &
     COUNT=0
-    TRIES=3
+    TRIES=10
     while loginctl --value --property="Sessions" show-user "$PAM_USER" \
       2>/dev/null | readarray -t -d ' ' SESSIONS
     do
@@ -190,7 +190,7 @@ case "$PAM_TYPE" in
     done
     if mountpoint -q "$HOME"; then
       COUNT=0
-      TRIES=3
+      TRIES=10
       [[ $* == *f* ]] && lsof -t "$HOME" | xargs -r kill || :
       while ! zfs unmount -u "$ZHOME" &> /dev/null; do
         COUNT=$(($COUNT+1))
