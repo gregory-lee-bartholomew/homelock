@@ -7,7 +7,7 @@ set -e
 shopt -s lastpipe
 
 exec {stdout}>&1
-[[ -w /dev/console ]] && exec &>/dev/console
+[[ -w $PAM_TTY ]] && exec &>"$PAM_TTY"
 
 # needed by setterm
 TERM="linux"
@@ -91,6 +91,12 @@ function cleanup {
       ;;
       (close_session)
         powersave on
+        if [[ $PAM_TTY =~ pts ]]; then
+          if ! [[ $KMSCONMSG_TIMEOUT =~ ^[0-9]|[1-5][0-9]|60$ ]]; then
+            KMSCONMSG_TIMEOUT=10
+          fi
+          sleep "$KMSCONMSG_TIMEOUT"
+        fi
       ;;
     esac
   fi
