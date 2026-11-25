@@ -7,7 +7,7 @@ set -e
 shopt -s lastpipe
 
 exec {stdout}>&1
-[[ -w $PAM_TTY ]] && exec &>"$PAM_TTY"
+[[ -w $PAM_TTY ]] && exec &>"$PAM_TTY" # && set -x
 
 # needed by setterm
 TERM="linux"
@@ -23,11 +23,11 @@ USER="$PAM_USER"
 MONO="$?"
 
 function pause {
-  [[ $PAM_TYPE == close_session ]] || return
+  [[ $PAM_TYPE == close_session ]] || return 0
   if ! [[ $KMSCONMSG_TIMEOUT =~ ^[0-9]|[1-5][0-9]|60$ ]]; then
     KMSCONMSG_TIMEOUT=10
   fi
-  trap ':' int
+  trap : int
   exec <"$PAM_TTY"
   sleep "$KMSCONMSG_TIMEOUT"
 }
